@@ -37,6 +37,10 @@ from models import ConferenceQueryForm
 from models import ConferenceQueryForms
 from models import TeeShirtSize
 
+from models import Session
+from models import SessionForm
+from models import SessionForms
+
 from settings import WEB_CLIENT_ID
 from settings import ANDROID_CLIENT_ID
 from settings import IOS_CLIENT_ID
@@ -81,6 +85,16 @@ CONF_GET_REQUEST = endpoints.ResourceContainer(
 
 CONF_POST_REQUEST = endpoints.ResourceContainer(
     ConferenceForm,
+    websafeConferenceKey=messages.StringField(1),
+)
+
+SESSION_GET_REQUEST = endpoints.ResourceContainer(
+    message_types.VoidMessage,
+    websafeConferenceKey=messages.StringField(1),
+)
+
+SESSION_POST_REQUEST = endpoints.ResourceContainer(
+    SessionForm,
     websafeConferenceKey=messages.StringField(1),
 )
 
@@ -152,6 +166,7 @@ class ConferenceApi(remote.Service):
         p_key = ndb.Key(Profile, user_id)
         c_id = Conference.allocate_ids(size=1, parent=p_key)[0]
         c_key = ndb.Key(Conference, c_id, parent=p_key)
+        print 'c_key', c_key
         data['key'] = c_key
         data['organizerUserId'] = request.organizerUserId = user_id
 
@@ -327,6 +342,63 @@ class ConferenceApi(remote.Service):
                 conferences]
         )
 
+
+# - - - Session objects - - - - - - - - - -- - - - - - - - -
+
+
+
+    def _createSessionObject(self, request):
+        """Create or update Session object, returning ConferenceForm/request."""
+        # preload necessary data items
+        
+        user = endpoints.get_current_user()
+        if not user:
+            raise endpoints.UnauthorizedException('Authorization required')
+        user_id = getUserId(user)
+
+        if not request.name:
+            raise endpoints.BadRequestException("Conference 'name' field required")
+
+        # copy ConferenceForm/ProtoRPC Message into dict
+        data = {field.name: getattr(request, field.name) for field in request.all_fields()}
+        del data['websafeKey']
+
+        # add default values for those missing (both data model & outbound Message)
+        # for df in DEFAULTS:
+        #     if data[df] in (None, []):
+        #         data[df] = DEFAULTS[df]
+        #         setattr(request, df, DEFAULTS[df])
+
+        # convert dates from strings to Date objects; set month based on start_date
+        
+        if data['date']:
+            data['date'] = datetime.strptime(data['date'][:10], "%Y-%m-%d").date()
+
+        
+        # generate Profile Key based on user ID and Session
+        # ID based on Profile key get Session key from ID
+        p_key = ndb.Key(Profile, user_id)
+        c_id = Session.allocate_ids(size=1, parent=p_key)[0]
+        c_key = ndb.Key(Session, c_id, parent=p_key)
+        
+        data['key'] = c_key
+
+        # create Session
+        Session(**data).put()
+        
+        return request
+
+    # @endpoints.method(request class, response class,
+    #         path='api pat',
+    #         http_method='POST',
+    #         name='name')
+
+    @endpoints.method(SessionForm, SessionForm, path='session',
+            http_method='POST', name='createSession')
+    def createSession(self, request):
+        """Create new conference."""
+        print 'calling session object'
+        return self._createSessionObject(request)
 
 # - - - Profile objects - - - - - - - - - - - - - - - - - - -
 
