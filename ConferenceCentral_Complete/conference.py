@@ -374,6 +374,12 @@ class ConferenceApi(remote.Service):
         if data['date']:
             data['date'] = datetime.strptime(data['date'][:10], "%Y-%m-%d").date()
 
+        if data['startTime']:
+            data['startTime'] = datetime.strptime(data['startTime'][:5],"%H:%M").time()
+
+        if data['duration']:
+            data['duration'] = datetime.strptime(data['duration'][:2],"%H").time()
+
         
         # generate Profile Key based on user ID and Session
         # ID based on Profile key get Session key from ID
